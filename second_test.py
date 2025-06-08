@@ -26,23 +26,26 @@ class BankServiceBoundaryTests(unittest.TestCase):
     
     def test_06_boundary_balance_values(self):
         try:
+            # Тест с нулевым балансом
             self.driver.get(f"{self.base_url}/?balance=0&reserved=0")
             time.sleep(2)
             
-            balance_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '0')]")
-            self.assertTrue(len(balance_elements) > 0)
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            self.assertEqual(balance_element.text, "0")
             
+            # Тест с минимальным балансом
             self.driver.get(f"{self.base_url}/?balance=1&reserved=0")
             time.sleep(2)
             
-            balance_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '1')]")
-            self.assertTrue(len(balance_elements) > 0)
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            self.assertEqual(balance_element.text, "1")
             
+            # Тест с большим балансом
             self.driver.get(f"{self.base_url}/?balance=999999&reserved=0")
             time.sleep(2)
             
-            balance_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '999') or contains(text(), '999999')]")
-            self.assertTrue(len(balance_elements) > 0)
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            self.assertEqual(balance_element.text, "999'999")
             
         except Exception as e:
             self.fail(f"Boundary balance values test failed: {str(e)}")
@@ -52,34 +55,31 @@ class BankServiceBoundaryTests(unittest.TestCase):
             self.driver.get(f"{self.base_url}/?balance=30000&reserved=20001")
             time.sleep(2)
             
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             
+            # Тест на превышение лимита символов
             card_input.clear()
             card_input.send_keys("12345678901234567890")
             time.sleep(1)
             
             current_value = card_input.get_attribute("value")
-            self.assertTrue(len(current_value) <= 16)
+            self.assertTrue(len(current_value.replace(" ", "")) <= 16)
             
+            # Тест на буквы в номере карты
             card_input.clear()
             card_input.send_keys("1234abcd56789012")
             time.sleep(1)
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            time.sleep(1)
-            
-            amount_inputs = self.driver.find_elements(By.XPATH, "//input[@type='number']")
-            error_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'ошибка') or contains(@class, 'error')]")
-            
-            self.assertTrue(len(amount_inputs) == 0 or len(error_elements) > 0)
+            # Проверяем что буквы были отфильтрованы
+            current_value = card_input.get_attribute("value")
+            self.assertNotRegex(current_value, r'[a-zA-Z]')
             
         except Exception as e:
             self.fail(f"Card number boundary validation test failed: {str(e)}")
@@ -89,37 +89,36 @@ class BankServiceBoundaryTests(unittest.TestCase):
             self.driver.get(f"{self.base_url}/?balance=10000&reserved=0")
             time.sleep(2)
             
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("1234567890123456")
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
             amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
+            
+            # Тест округления вниз для 55 -> комиссия должна быть 5, а не 5.5
             amount_input.clear()
             amount_input.send_keys("55")
-            
             time.sleep(2)
             
-            commission_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '5') and not(contains(text(), '5.5'))]")
-            self.assertTrue(len(commission_elements) > 0)
+            commission_element = self.driver.find_element(By.XPATH, "//span[@id='comission']")
+            self.assertEqual(commission_element.text, "5")
             
+            # Тест округления вниз для 199 -> комиссия должна быть 19, а не 19.9
             amount_input.clear()
             amount_input.send_keys("199")
             time.sleep(2)
             
-            commission_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '19') and not(contains(text(), '19.9'))]")
-            self.assertTrue(len(commission_elements) > 0)
+            commission_element = self.driver.find_element(By.XPATH, "//span[@id='comission']")
+            self.assertEqual(commission_element.text, "19")
             
         except Exception as e:
             self.fail(f"Commission rounding test failed: {str(e)}")
@@ -129,64 +128,68 @@ class BankServiceBoundaryTests(unittest.TestCase):
             self.driver.get(f"{self.base_url}/?balance=10000&reserved=0")
             time.sleep(2)
             
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("1234567890123456")
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
             amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
-            amount_input.clear()
-            amount_input.send_keys("9090")
             
+            # Проверяем максимально возможную сумму (10000 - 0 - 1000 - комиссия)
+            # Доступно: 10000, комиссия: 1000, макс сумма: около 8181
+            amount_input.clear()
+            amount_input.send_keys("8181")
             time.sleep(2)
             
             transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
-            self.assertTrue(len(transfer_buttons) > 0)
+            self.assertTrue(len(transfer_buttons) > 0, "Transfer button should be available for valid amount")
             
+            # Проверяем сумму, превышающую лимит
             amount_input.clear()
-            amount_input.send_keys("9091")
+            amount_input.send_keys("9000")
             time.sleep(2)
             
+            error_messages = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Недостаточно средств')]")
             transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
-            error_messages = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'невозможен')]")
             
-            self.assertTrue(len(transfer_buttons) > 0 or len(error_messages) > 0)
+            self.assertTrue(len(error_messages) > 0 or len(transfer_buttons) == 0, "Should show error or hide button for invalid amount")
             
         except Exception as e:
             self.fail(f"Equal amount transfer test failed: {str(e)}")
     
     def test_10_url_parameters_validation(self):
         try:
+            # Тест без параметров
             self.driver.get(f"{self.base_url}")
             time.sleep(2)
             
-            page_elements = self.driver.find_elements(By.XPATH, "//*")
-            self.assertTrue(len(page_elements) > 5)
+            title_element = self.driver.find_element(By.XPATH, "//h1[text()='F-Bank']")
+            self.assertTrue(title_element.is_displayed())
             
+            # Тест с некорректными параметрами
             self.driver.get(f"{self.base_url}/?balance=abc&reserved=def")
             time.sleep(2)
             
-            page_elements = self.driver.find_elements(By.XPATH, "//*")
-            self.assertTrue(len(page_elements) > 5)
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            self.assertEqual(balance_element.text, "0", "Invalid balance should default to 0")
             
-            self.driver.get(f"{self.base_url}/?reserved=5000&balance=1000")
+            # Тест с корректными параметрами в другом порядке
+            self.driver.get(f"{self.base_url}/?reserved=5000&balance=10000")
             time.sleep(2)
             
-            balance_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '1000') or contains(text(), '1') and contains(text(), '000')]")
-            reserved_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '5000') or contains(text(), '5') and contains(text(), '000')]")
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            reserved_element = self.driver.find_element(By.XPATH, "//span[@id='rub-reserved']")
             
-            self.assertTrue(len(balance_elements) > 0 and len(reserved_elements) > 0)
+            self.assertEqual(balance_element.text, "10'000")
+            self.assertEqual(reserved_element.text, "5'000")
             
         except Exception as e:
             self.fail(f"URL parameters validation test failed: {str(e)}")

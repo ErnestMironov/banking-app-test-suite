@@ -26,6 +26,12 @@ class BankServiceTests(unittest.TestCase):
     def setUp(self):
         self.driver.get(f"{self.base_url}/?balance=30000&reserved=20001")
         time.sleep(2)
+        # Закрываем alert если он есть (от предыдущих тестов)
+        try:
+            alert = self.driver.switch_to.alert
+            alert.accept()
+        except:
+            pass
     
     def test_01_balance_display(self):
         try:
@@ -42,119 +48,112 @@ class BankServiceTests(unittest.TestCase):
     
     def test_02_card_number_validation_correct(self):
         try:
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
-            
+            rub_button.click()
+
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("1234567890123456")
-            
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
+
             amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
             self.assertTrue(amount_input.is_displayed())
-            
+
         except Exception as e:
             self.fail(f"Card number validation test failed: {str(e)}")
     
     def test_03_card_number_validation_incorrect(self):
         try:
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("12345")
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
             time.sleep(1)
             
+            amount_inputs = self.driver.find_elements(By.XPATH, "//input[@placeholder='1000']")
             error_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'ошибка') or contains(text(), 'неверн') or contains(@class, 'error')]")
-            amount_inputs = self.driver.find_elements(By.XPATH, "//input[@type='number']")
             
-            self.assertTrue(len(error_elements) > 0 or len(amount_inputs) == 0)
+            self.assertTrue(len(amount_inputs) == 0 or len(error_elements) > 0)
             
         except Exception as e:
             self.fail(f"Incorrect card number validation test failed: {str(e)}")
     
     def test_04_successful_transfer_with_commission(self):
         try:
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("1234567890123456")
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
             amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
             amount_input.clear()
-            amount_input.send_keys("5000")
+            amount_input.send_keys("1000")
             
             time.sleep(1)
             
-            commission_element = self.driver.find_element(By.XPATH, "//*[contains(text(), '500') or contains(text(), 'комиссия')]")
+            commission_element = self.driver.find_element(By.XPATH, "//*[@id='comission' or contains(text(), '100')]")
             self.assertTrue(commission_element.is_displayed())
             
-            transfer_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Перевести')]")
+            transfer_button = self.driver.find_element(By.XPATH, "//button[.//span[text()='Перевести']]")
             self.assertTrue(transfer_button.is_displayed())
             
             transfer_button.click()
             
-            notification = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//*[contains(text(), 'принял') or contains(text(), 'запрос')]"))
-            )
-            self.assertTrue(notification.is_displayed())
+            # Ожидаем и проверяем alert об успешном переводе
+            time.sleep(1)
+            try:
+                alert = self.driver.switch_to.alert
+                alert_text = alert.text
+                self.assertIn("принят банком", alert_text)
+                alert.accept()
+            except:
+                self.fail("Expected success alert after transfer")
             
         except Exception as e:
             self.fail(f"Successful transfer test failed: {str(e)}")
     
     def test_05_transfer_exceeds_available_amount(self):
         try:
-            account_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'account') or contains(text(), 'руб')]"))
+            rub_button = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
-            account_button.click()
+            rub_button.click()
             
             card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @placeholder]"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
             card_input.clear()
             card_input.send_keys("1234567890123456")
             
-            confirm_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Подтвердить') or contains(text(), 'Далее')]")
-            confirm_button.click()
-            
             amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@type='number' or @type='text']"))
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
             amount_input.clear()
-            amount_input.send_keys("9500")
+            amount_input.send_keys("15000")
             
             time.sleep(2)
             
-            error_messages = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'невозможен') or contains(text(), 'недостаточно')]")
+            error_messages = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Недостаточно средств')]")
             transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
             
             self.assertTrue(len(error_messages) > 0 or len(transfer_buttons) == 0)
