@@ -123,7 +123,21 @@ class BankServiceBoundaryTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Commission rounding test failed: {str(e)}")
     
-    def test_09_transfer_equal_to_available_amount(self):
+    def test_09_bug_003_nan_display_with_invalid_url_params(self):
+        try:
+            # Тест с некорректными параметрами - должен показывать NaN (это баг)
+            self.driver.get(f"{self.base_url}/?balance=abc&reserved=xyz")
+            time.sleep(2)
+            
+            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
+            
+            # Ожидаем "0", но приложение показывает "NaN" - это баг
+            self.assertEqual(balance_element.text, "0", f"Invalid URL params should show '0', but got: {balance_element.text}")
+            
+        except Exception as e:
+            self.fail(f"URL NaN validation test failed: {str(e)}")
+    
+    def test_10_bug_004_negative_amounts_acceptance(self):
         try:
             self.driver.get(f"{self.base_url}/?balance=10000&reserved=0")
             time.sleep(2)
@@ -143,56 +157,22 @@ class BankServiceBoundaryTests(unittest.TestCase):
                 EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
             
-            # Проверяем максимально возможную сумму (10000 - 0 - 1000 - комиссия)
-            # Доступно: 10000, комиссия: 1000, макс сумма: около 8181
+            # Вводим отрицательную сумму
             amount_input.clear()
-            amount_input.send_keys("8181")
+            amount_input.send_keys("-100")
             time.sleep(2)
             
-            transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
-            self.assertTrue(len(transfer_buttons) > 0, "Transfer button should be available for valid amount")
-            
-            # Проверяем сумму, превышающую лимит
-            amount_input.clear()
-            amount_input.send_keys("9000")
-            time.sleep(2)
-            
-            error_messages = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Недостаточно средств')]")
+            # Проверяем что кнопка НЕ должна быть активна
             transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
             
-            self.assertTrue(len(error_messages) > 0 or len(transfer_buttons) == 0, "Should show error or hide button for invalid amount")
+            if len(transfer_buttons) > 0:
+                button = transfer_buttons[0]
+                self.assertFalse(button.is_enabled(), "Transfer button should be disabled for negative amounts")
+            else:
+                self.fail("Transfer button should exist but be disabled for negative amounts")
             
         except Exception as e:
-            self.fail(f"Equal amount transfer test failed: {str(e)}")
-    
-    def test_10_url_parameters_validation(self):
-        try:
-            # Тест без параметров
-            self.driver.get(f"{self.base_url}")
-            time.sleep(2)
-            
-            title_element = self.driver.find_element(By.XPATH, "//h1[text()='F-Bank']")
-            self.assertTrue(title_element.is_displayed())
-            
-            # Тест с некорректными параметрами
-            self.driver.get(f"{self.base_url}/?balance=abc&reserved=def")
-            time.sleep(2)
-            
-            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
-            self.assertEqual(balance_element.text, "0", "Invalid balance should default to 0")
-            
-            # Тест с корректными параметрами в другом порядке
-            self.driver.get(f"{self.base_url}/?reserved=5000&balance=10000")
-            time.sleep(2)
-            
-            balance_element = self.driver.find_element(By.XPATH, "//span[@id='rub-sum']")
-            reserved_element = self.driver.find_element(By.XPATH, "//span[@id='rub-reserved']")
-            
-            self.assertEqual(balance_element.text, "10'000")
-            self.assertEqual(reserved_element.text, "5'000")
-            
-        except Exception as e:
-            self.fail(f"URL parameters validation test failed: {str(e)}")
+            self.fail(f"Negative amounts test failed: {str(e)}")
 
 
 if __name__ == "__main__":

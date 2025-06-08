@@ -107,46 +107,7 @@ class BankServiceUITests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Multiple clicks rapid input test failed: {str(e)}")
     
-    def test_14_keyboard_accessibility(self):
-        try:
-            rub_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
-            )
-            
-            # Проверяем доступность с клавиатуры
-            actions = ActionChains(self.driver)
-            actions.send_keys(Keys.TAB).perform()  # Переход к первому элементу
-            time.sleep(0.5)
-            
-            # Нажимаем Enter на карточке
-            rub_button.click()  # Симуляция клика с клавиатуры
-            
-            card_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
-            )
-            
-            # Проверяем что можем вводить с клавиатуры
-            card_input.send_keys("1234567890123456")
-            
-            # Используем Tab для перехода к следующему полю
-            card_input.send_keys(Keys.TAB)
-            
-            amount_input = self.wait.until(
-                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
-            )
-            
-            # Вводим сумму
-            amount_input.send_keys("2000")
-            time.sleep(1)
-            
-            # Проверяем что все поля доступны для навигации
-            self.assertTrue(card_input.is_enabled())
-            self.assertTrue(amount_input.is_enabled())
-            
-        except Exception as e:
-            self.fail(f"Keyboard accessibility test failed: {str(e)}")
-    
-    def test_15_data_security_no_persistence(self):
+    def test_14_bug_005_zero_amount_transfer_allowed(self):
         try:
             rub_button = self.wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
@@ -161,13 +122,25 @@ class BankServiceUITests(unittest.TestCase):
             amount_input = self.wait.until(
                 EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
             )
-            amount_input.send_keys("5000")
             
-            # Обновляем страницу
-            self.driver.refresh()
+            # Вводим нулевую сумму
+            amount_input.send_keys("0")
             time.sleep(2)
             
-            # Проверяем что данные не сохранились
+            # Проверяем что кнопка НЕ должна быть активна для нулевой суммы
+            transfer_buttons = self.driver.find_elements(By.XPATH, "//button[contains(text(), 'Перевести')]")
+            
+            if len(transfer_buttons) > 0:
+                button = transfer_buttons[0]
+                self.assertFalse(button.is_enabled(), "Transfer button should be disabled for zero amount")
+            else:
+                self.fail("Transfer button should exist but be disabled for zero amount")
+            
+        except Exception as e:
+            self.fail(f"Zero amount transfer test failed: {str(e)}")
+    
+    def test_15_bug_006_decimal_amount_processing(self):
+        try:
             rub_button = self.wait.until(
                 EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'g-card') and .//h2[text()='Рубли']]"))
             )
@@ -176,22 +149,32 @@ class BankServiceUITests(unittest.TestCase):
             card_input = self.wait.until(
                 EC.presence_of_element_located((By.XPATH, "//input[@placeholder='0000 0000 0000 0000']"))
             )
+            card_input.send_keys("1234567890123456")
             
-            # Поле должно быть пустым
-            card_value = card_input.get_attribute("value")
-            self.assertEqual(card_value, "", "Card input should be empty after page refresh")
+            amount_input = self.wait.until(
+                EC.presence_of_element_located((By.XPATH, "//input[@placeholder='1000']"))
+            )
             
-            # Проверяем что в локальном хранилище нет чувствительных данных
-            local_storage_keys = self.driver.execute_script("return Object.keys(localStorage);")
-            session_storage_keys = self.driver.execute_script("return Object.keys(sessionStorage);")
+            # Вводим дробную сумму
+            amount_input.send_keys("100.50")
+            time.sleep(2)
             
-            # Не должно быть ключей связанных с картами
-            card_related_keys = [key for key in local_storage_keys + session_storage_keys 
-                               if 'card' in key.lower() or 'credit' in key.lower()]
-            self.assertEqual(len(card_related_keys), 0, "No card-related data should be stored")
+            # Проверяем отображаемую сумму - должна быть 100.50, но система показывает 10050
+            displayed_amount = amount_input.get_attribute("value")
+            
+            # Ожидаем корректную обработку как 100.50, но получаем 10050 (это баг)
+            self.assertEqual(displayed_amount, "100.50", f"Decimal amount should be processed as 100.50, but got: {displayed_amount}")
+            
+            # Проверяем комиссию - должна быть от 100.50, а не от 10050
+            commission_element = self.driver.find_element(By.XPATH, "//span[@id='comission']")
+            commission_text = commission_element.text
+            
+            # Ожидаем комиссию ~10, но получаем от 10050 (это баг)
+            self.assertTrue("10" in commission_text and "1005" not in commission_text, 
+                          f"Commission should be calculated from 100.50, not 10050. Got: {commission_text}")
             
         except Exception as e:
-            self.fail(f"Data security test failed: {str(e)}")
+            self.fail(f"Decimal amount processing test failed: {str(e)}")
 
 
 if __name__ == "__main__":
