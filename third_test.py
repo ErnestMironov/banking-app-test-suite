@@ -1,4 +1,3 @@
-# Created: 15.06.2025
 # Author: Миронов Эрнест Арвович
 # Automated tests for THIRD.md test cases
 import unittest

@@ -1,4 +1,3 @@
-# Created: 11.06.2025
 # Author: Ягунов Денис Алексеевич
 # Automated tests for SECOND.md test cases
 import unittest

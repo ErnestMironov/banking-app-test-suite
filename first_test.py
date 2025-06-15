@@ -1,4 +1,3 @@
-# Created: 04.06.2025
 # Author: Самелюк Юрий Дмитриевич
 # Automated tests for FIRST.md test cases
 import unittest
