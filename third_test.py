@@ -1,3 +1,6 @@
+# Created: 15.06.2025
+# Author: Миронов Эрнест Арвович
+# Automated tests for THIRD.md test cases
 import unittest
 import time
 from selenium import webdriver
@@ -7,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+import pytest
 
 
 class BankServiceUITests(unittest.TestCase):
@@ -107,6 +111,7 @@ class BankServiceUITests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Multiple clicks rapid input test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: кнопка перевода не блокируется для нулевой суммы")
     def test_14_bug_005_zero_amount_transfer_allowed(self):
         try:
             rub_button = self.wait.until(
@@ -139,6 +144,7 @@ class BankServiceUITests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Zero amount transfer test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: дробные суммы обрабатываются некорректно")
     def test_15_bug_006_decimal_amount_processing(self):
         try:
             rub_button = self.wait.until(

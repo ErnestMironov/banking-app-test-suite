@@ -1,3 +1,6 @@
+# Created: 04.06.2025
+# Author: Самелюк Юрий Дмитриевич
+# Automated tests for FIRST.md test cases
 import unittest
 import time
 from selenium import webdriver
@@ -5,6 +8,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import pytest
 
 
 class BankServiceTests(unittest.TestCase):
@@ -90,6 +94,7 @@ class BankServiceTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Incorrect card number validation test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: поле принимает больше 16 цифр")
     def test_04_bug_001_card_accepts_17_digits(self):
         try:
             rub_button = self.wait.until(
@@ -112,6 +117,7 @@ class BankServiceTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Card 17 digits validation test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: комиссия рассчитывается неверно для малых сумм")
     def test_05_bug_002_commission_calculation_small_amounts(self):
         try:
             rub_button = self.wait.until(

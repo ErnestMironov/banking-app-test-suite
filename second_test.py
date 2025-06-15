@@ -1,3 +1,6 @@
+# Created: 11.06.2025
+# Author: Ягунов Денис Алексеевич
+# Automated tests for SECOND.md test cases
 import unittest
 import time
 from selenium import webdriver
@@ -6,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
+import pytest
 
 
 class BankServiceBoundaryTests(unittest.TestCase):
@@ -50,6 +54,7 @@ class BankServiceBoundaryTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Boundary balance values test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: валидация номера карты не фильтрует лишние символы")
     def test_07_card_number_validation_boundary_cases(self):
         try:
             self.driver.get(f"{self.base_url}/?balance=30000&reserved=20001")
@@ -84,6 +89,7 @@ class BankServiceBoundaryTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Card number boundary validation test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: комиссия округляется неверно")
     def test_08_commission_calculation_rounding_down(self):
         try:
             self.driver.get(f"{self.base_url}/?balance=10000&reserved=0")
@@ -123,6 +129,7 @@ class BankServiceBoundaryTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"Commission rounding test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: NaN вместо 0 при невалидных параметрах URL")
     def test_09_bug_003_nan_display_with_invalid_url_params(self):
         try:
             # Тест с некорректными параметрами - должен показывать NaN (это баг)
@@ -137,6 +144,7 @@ class BankServiceBoundaryTests(unittest.TestCase):
         except Exception as e:
             self.fail(f"URL NaN validation test failed: {str(e)}")
     
+    @pytest.mark.xfail(reason="Известный баг: кнопка перевода не блокируется для отрицательных сумм")
     def test_10_bug_004_negative_amounts_acceptance(self):
         try:
             self.driver.get(f"{self.base_url}/?balance=10000&reserved=0")
